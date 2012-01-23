@@ -84,6 +84,7 @@ module wb_port #(
 	reg  [31:0]			cycle_count;
 	reg  [31:0]			ack_count;
 	reg  [2:0]			state;
+	reg				read_invalid;
 
 	parameter [2:0]
 		IDLE	= 3'd0,
@@ -165,14 +166,17 @@ module wb_port #(
 	always @(posedge sdram_clk)
 		wb_cycle_r <= wb_cycle;
 
-	always @(posedge sdram_clk)
-		if (sdram_rst)
+	always @(posedge sdram_clk) begin
+		if (sdram_rst) begin
 			buf_clean <= {(1<<BUF_WIDTH){1'b0}};
-		else if (!wb_we_i & wb_cycle_edge & !bufhit)
+		end else if (!wb_we_i & wb_cycle_edge & !bufhit) begin
 			buf_clean <= {(1<<BUF_WIDTH){1'b0}};
-		else if ((state == READ) & !even_adr &
-			(ack_i | (ack_count > 0 & cycle_count < 7)))
+		end else if ((state == READ) & !even_adr &
+			(ack_i | (ack_count > 0 & cycle_count < 7)) &
+			!read_invalid) begin
 			buf_clean[adr_i[BUF_WIDTH+1:2]] <= 1'b1;
+		end
+	end
 
 	always @(posedge sdram_clk) begin
 		if (sdram_rst) begin
@@ -197,6 +201,7 @@ module wb_port #(
 			IDLE: begin
 				wb_req <= 1'b0;
 				we_o <= 1'b0;
+				read_invalid <= 0;
 				if (wb_we_i & (wb_cycle_edge | wb_req & wb_cycle)) begin
 					/*
 					 FIXME?: acking without knowing that
@@ -256,6 +261,9 @@ module wb_port #(
 					acc_o <= 1'b0;
 					state <= IDLE;
 				end
+				/* Incoming access that is not to the current read */
+				if(!wb_we_i & wb_cycle_edge & !bufhit)
+					read_invalid = 1;
 			end
 
 			WRITE: begin
