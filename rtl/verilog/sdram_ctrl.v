@@ -323,7 +323,9 @@ module sdram_ctrl #(
 						adr_o[1] <= adr_o[1] + 1'b1;
 				end
 
-				if (cycle_count >= (BURST_LENGTH-1) & next_state != READ)
+				/* dqm has a latency of 2 cycles */
+				if (cycle_count >= (BURST_LENGTH-1 + tCAC - 2) &
+				    next_state != READ)
 					dqm_o <= 2'b11;
 
 				if (cycle_count >= (BURST_LENGTH-1) & next_state == IDLE) begin
