@@ -24,6 +24,7 @@
  */
 
 module wb_port #(
+	parameter TECHNOLOGY = "GENERIC",
 	parameter BUF_WIDTH = 3
 )
 (
@@ -60,36 +61,59 @@ module wb_port #(
 	input			bufw_we_i
 );
 
-	wire				wb_cycle;
-	reg				wb_cycle_r;
-	wire				wb_cycle_edge;
-	reg				wb_req;
-	wire				wb_ack;
+	reg  [31:0]			wb_adr;
+	reg  [31:0]			wb_dat;
+	reg  [3:0]			wb_sel;
 	wire [31:0]			next_wb_adr;
-	reg  [31:0]			buf_data[(1<<BUF_WIDTH)-1:0];
+
+	reg				wb_write_bufram;
+	reg				sdram_write_bufram;
+	wire [3:0]			wb_bufram_we;
+	wire [(1<<BUF_WIDTH)-1:0]	wb_bufram_addr;
+	wire [31:0]			wb_bufram_di;
+	wire [3:0]			sdram_bufram_we;
+
 	reg  [31:BUF_WIDTH+2]		buf_adr;
 	reg  [(1<<BUF_WIDTH)-1:0]	buf_clean;
+	reg  [(1<<BUF_WIDTH)-1:0]	buf_clean_r;
 	reg  [(1<<BUF_WIDTH)-1:0]	buf_clean_wb;
-	reg  [31:0]			dat_r;
-	reg  [3:0]			sel_r;
-	reg  [31:0]			adr_o_r;
 	wire				bufhit;
 	wire				next_bufhit;
-	wire				adrhit;
+	wire				bufw_hit;
+
+	reg				read_req_wb;
+	reg				read_req;
+	reg				read_req_sdram;
 	reg				read_done;
 	reg				read_done_ack;
-	reg				write_done;
-	reg				write_done_ack;
+
+	reg  [31:0]			dat_r;
+	reg  [31:0]			adr_o_r;
 	wire				even_adr;
 	reg  [31:0]			cycle_count;
 	reg  [31:0]			ack_count;
-	reg  [2:0]			state;
-	reg				read_invalid;
+
+	reg				first_req;
+
+	reg  [2:0]			sdram_state;
+	reg  [2:0]			wb_state;
+
+	wire				wrfifo_full;
+	wire				wrfifo_empty;
+	wire				wrfifo_rdreq;
+	reg				wrfifo_wrreq;
+	wire [71:0]			wrfifo_rddata;
+
+	wire [3:0]			sdram_sel;
+	wire [31:0]			sdram_dat;
+	wire [31:0]			sdram_adr;
 
 	parameter [2:0]
 		IDLE	= 3'd0,
 		READ	= 3'd1,
-		WRITE	= 3'd2;
+		WRITE	= 3'd2,
+		REFILL	= 3'd3;
+
 
 	parameter [2:0]
 		CLASSIC      = 3'b000,
@@ -103,8 +127,6 @@ module wb_port #(
 		WRAP8_BURST  = 2'b10,
 		WRAP16_BURST = 2'b11;
 
-	assign wb_cycle      = wb_stb_i & wb_cyc_i & !wb_ack_o;
-	assign wb_cycle_edge = wb_cycle & !wb_cycle_r;
 	assign next_wb_adr   = (wb_bte_i == LINEAR_BURST) ?
 			       (wb_adr_i[31:0] + 32'd4) :
 			       (wb_bte_i == WRAP4_BURST ) ?
@@ -114,27 +136,76 @@ module wb_port #(
 			     /*(wb_bte_i == WRAP16_BURST) ?*/
 			       {wb_adr_i[31:6], wb_adr_i[5:0] + 6'd4};
 
-	assign bufhit	     = (buf_adr == wb_adr_i[31:BUF_WIDTH+2]);
-	assign next_bufhit   = (buf_adr == next_wb_adr[31:BUF_WIDTH+2]);
-	assign adrhit	     = (adr_i[31:2] == wb_adr_i[31:2]);
-	assign wb_dat_o      = buf_data[wb_adr_i[BUF_WIDTH+1:2]];
-	assign wb_ack	     = (((buf_clean_wb[wb_adr_i[BUF_WIDTH+1:2]] &
-			       bufhit & !wb_ack_o) |
-			       (buf_clean_wb[next_wb_adr[BUF_WIDTH+1:2]] &
-			       next_bufhit & (wb_cti_i == INC_BURST) &
-			       wb_ack_o)) & wb_stb_i & wb_cyc_i & !wb_we_i) |
-			       ((!wb_we_i & read_done & !read_done_ack) |
-			       (wb_we_i & write_done & !write_done_ack) &
-			       wb_cycle);
+	assign bufhit	     = (buf_adr == wb_adr_i[31:BUF_WIDTH+2]) &
+			       buf_clean_wb[wb_adr_i[BUF_WIDTH+1:2]];
+	assign next_bufhit   = (buf_adr == next_wb_adr[31:BUF_WIDTH+2]) &
+			       buf_clean_wb[next_wb_adr[BUF_WIDTH+1:2]];
+	assign bufw_hit      = (bufw_adr_i[31:BUF_WIDTH+2] ==
+				wb_adr_i[31:BUF_WIDTH+2]);
 
-	assign even_adr	     = (adr_i[1] == 1'b0);
+	assign even_adr      = (adr_i[1] == 1'b0);
 	// output lower 16 bits after first write ack
-	assign adr_o	     = ((state == WRITE) & ack_i) ?
-			       adr_o_r + 2 : adr_o_r;
-	assign dat_o	     = ((state == WRITE) & ack_i) ?
-			       dat_r[15:0] : dat_r[31:16];
-	assign sel_o	     = ((state == WRITE) & ack_i) ?
-			       sel_r[1:0]  : sel_r[3:2];
+	assign adr_o	     = (sdram_state == WRITE) ?
+			       (ack_i) ? sdram_adr + 2 : sdram_adr :
+			       adr_o_r;
+	assign dat_o	     = ((sdram_state == WRITE) & ack_i) ?
+			       sdram_dat[15:0] : sdram_dat[31:16];
+	assign sel_o	     = ((sdram_state == WRITE) & ack_i) ?
+			       sdram_sel[1:0]  : sdram_sel[3:2];
+
+	assign wrfifo_rdreq  = (sdram_state == IDLE) & !wrfifo_empty;
+
+	assign wb_bufram_we  = bufw_we_i & bufw_hit ? bufw_sel_i :
+			       wb_write_bufram ? wb_sel : 4'b0;
+
+	assign wb_bufram_addr = bufw_we_i & bufw_hit ?
+			        bufw_adr_i[BUF_WIDTH+1:2] :
+			        wb_write_bufram ?
+			        wb_adr[BUF_WIDTH+1:2] :
+			        (wb_cti_i == INC_BURST) & wb_ack_o ?
+			        next_wb_adr[BUF_WIDTH+1:2] :
+			        wb_adr_i[BUF_WIDTH+1:2];
+	assign wb_bufram_di   = bufw_we_i & bufw_hit ? bufw_dat_i : wb_dat;
+	assign sdram_bufram_we = {4{sdram_write_bufram}};
+
+	assign sdram_sel      = wrfifo_rddata[3:0];
+	assign sdram_dat      = wrfifo_rddata[35:4];
+	assign sdram_adr      = {wrfifo_rddata[65:36], 2'b00};
+
+bufram #(
+	.TECHNOLOGY(TECHNOLOGY),
+	.ADDR_WIDTH(BUF_WIDTH)
+) bufram (
+	.clk_a		(wb_clk),
+	.addr_a		(wb_bufram_addr),
+	.we_a		(wb_bufram_we),
+	.di_a		(wb_bufram_di),
+	.do_a		(wb_dat_o),
+
+	.clk_b		(sdram_clk),
+	.addr_b		(adr_i[BUF_WIDTH+1:2]),
+	.we_b		(sdram_bufram_we),
+	.di_b		({dat_r[31:16], dat_i}),
+	.do_b		()
+);
+
+dual_clock_fifo #(
+	.ADDR_WIDTH(3),
+	.DATA_WIDTH(72)
+) wrfifo (
+	.wr_rst_i	(wb_rst),
+	.wr_clk_i	(wb_clk),
+	.wr_en_i	(wrfifo_wrreq),
+	.wr_data_i	({6'b0, wb_adr_i[31:2],  wb_dat_i,  wb_sel_i}),
+
+	.rd_rst_i	(sdram_rst),
+	.rd_clk_i	(sdram_clk),
+	.rd_en_i	(wrfifo_rdreq),
+	.rd_data_o	(wrfifo_rddata),
+
+	.full_o		(wrfifo_full),
+	.empty_o	(wrfifo_empty)
+);
 
 	//
 	// WB clock domain
@@ -146,91 +217,131 @@ module wb_port #(
 			read_done_ack <= 1'b0;
 
 	always @(posedge wb_clk)
-		if (write_done)
-			write_done_ack <= 1'b1;
-		else
-			write_done_ack <= 1'b0;
-
-	always @(posedge wb_clk)
-		if (wb_rst)
+		if (wb_rst) begin
 			wb_ack_o <= 1'b0;
-		else
-			wb_ack_o <= wb_ack;
+			wb_write_bufram <= 1'b0;
+			wrfifo_wrreq <= 1'b0;
+			read_req_wb <= 1'b0;
+			first_req <= 1'b1;
+			wb_adr <= 0;
+			wb_dat <= 0;
+			wb_sel <= 0;
+			wb_state <= IDLE;
+		end else begin
+			wb_ack_o <= 1'b0;
+			wb_write_bufram <= 1'b0;
+			wrfifo_wrreq <= 1'b0;
+			case (wb_state)
+			IDLE: begin
+				wb_sel <= wb_sel_i;
+				wb_dat <= wb_dat_i;
+				wb_adr <= wb_adr_i;
+				if (wb_cyc_i & wb_stb_i & !wb_we_i) begin
+					if (bufhit) begin
+						wb_ack_o <= 1'b1;
+						wb_state <= READ;
+					/*
+					 * wait for the ongoing refill to finish
+					 * until issuing a new request
+					 */
+					end else if (buf_clean_wb[wb_adr_i[BUF_WIDTH+1:2]] |
+						     first_req) begin
+						first_req <= 1'b0;
+						read_req_wb <= 1'b1;
+						wb_state <= REFILL;
+					end
+				end else if (wb_cyc_i & wb_stb_i & wb_we_i) begin
+					if (!wrfifo_full) begin
+						wrfifo_wrreq <= 1'b1;
+						wb_ack_o <= 1'b1;
+					end
 
-	always @(posedge wb_clk)
-		buf_clean_wb <= buf_clean;
+					if (bufhit)
+						wb_write_bufram <= 1'b1;
+
+					wb_state <= WRITE;
+				end
+			end
+
+			READ: begin
+				if (wb_cyc_i & wb_stb_i & !wb_we_i &
+				   (wb_cti_i == INC_BURST) & next_bufhit) begin
+					wb_ack_o <= 1'b1;
+				end else begin
+					wb_state <= IDLE;
+				end
+			end
+
+			REFILL: begin
+				buf_adr <= wb_adr[31:BUF_WIDTH+2];
+				if (read_done) begin
+					read_req_wb <= 1'b0;
+					wb_state <= IDLE;
+				end
+			end
+
+			WRITE: begin
+				if (wb_cyc_i & wb_stb_i & wb_we_i &
+				  ((wb_cti_i == INC_BURST) | !wb_ack_o)) begin
+
+					if (!wrfifo_full) begin
+						wrfifo_wrreq <= 1'b1;
+						wb_ack_o <= 1'b1;
+					end
+
+					if (bufhit)
+						wb_write_bufram <= 1'b1;
+				end else begin
+					wb_state <= IDLE;
+				end
+			end
+			endcase
+		end
+
+	always @(posedge wb_clk) begin
+		buf_clean_r <= buf_clean;
+		buf_clean_wb <= buf_clean_r;
+	end
 
 	//
 	// SDRAM clock domain
 	//
-	always @(posedge sdram_clk)
-		wb_cycle_r <= wb_cycle;
-
 	always @(posedge sdram_clk) begin
-		if (sdram_rst) begin
-			buf_clean <= {(1<<BUF_WIDTH){1'b0}};
-		end else if (!wb_we_i & wb_cycle_edge & !bufhit) begin
-			buf_clean <= {(1<<BUF_WIDTH){1'b0}};
-		end else if ((state == READ) & !even_adr &
-			(ack_i | (ack_count > 0 & cycle_count < 7)) &
-			!read_invalid) begin
-			buf_clean[adr_i[BUF_WIDTH+1:2]] <= 1'b1;
-		end
+		read_req <= read_req_wb;
+		read_req_sdram <= read_req;
 	end
 
 	always @(posedge sdram_clk) begin
 		if (sdram_rst) begin
-			state <= IDLE;
+			sdram_state <= IDLE;
 			acc_o <= 1'b0;
 			we_o <= 1'b0;
 			cycle_count <= 0;
 			ack_count <= 0;
 			read_done <= 1'b0;
-			write_done <= 1'b0;
-			buf_adr <= 0;
+			buf_clean <= {(1<<BUF_WIDTH){1'b0}};
+			sdram_write_bufram <= 1'b0;
 		end else begin
+			sdram_write_bufram <= 1'b0;
+
 			if (ack_i)
 				ack_count <= ack_count + 1;
 
-			if (wb_cycle_edge)
-				wb_req <= 1'b1;
-
 			cycle_count <= cycle_count + 1;
 
-			case (state)
+			case (sdram_state)
 			IDLE: begin
-				wb_req <= 1'b0;
 				we_o <= 1'b0;
-				read_invalid <= 0;
-				if (wb_we_i & (wb_cycle_edge | wb_req & wb_cycle)) begin
-					/*
-					 FIXME?: acking without knowing that
-					 we have control over the SDRAM
-					 interface is a bit bold, consider
-					 adding a "in control" input signal
-					 */
-					write_done <= 1'b1;
-					state <= WRITE;
-					dat_r <= wb_dat_i;
-					sel_r <= wb_sel_i;
-					adr_o_r <= {wb_adr_i[31:2], 2'b00};
+				ack_count <= 0;
+				if (!wrfifo_empty) begin
+					sdram_state <= WRITE;
 					acc_o <= 1'b1;
 					we_o <= 1'b1;
-					ack_count <= 0;
-					if (bufhit & wb_sel_i[3])
-						buf_data[wb_adr_i[BUF_WIDTH+1:2]][31:24] <= wb_dat_i[31:24];
-					if (bufhit & wb_sel_i[2])
-						buf_data[wb_adr_i[BUF_WIDTH+1:2]][23:16] <= wb_dat_i[23:16];
-					if (bufhit & wb_sel_i[1])
-						buf_data[wb_adr_i[BUF_WIDTH+1:2]][15:8]  <= wb_dat_i[15:8];
-					if (bufhit & wb_sel_i[0])
-						buf_data[wb_adr_i[BUF_WIDTH+1:2]][7:0]   <= wb_dat_i[7:0];
-				end else if (!wb_we_i & (wb_cycle_edge | (wb_req & wb_cycle)) &
-					     (!bufhit | !buf_clean[wb_adr_i[BUF_WIDTH+1:2]])) begin
-					state <= READ;
-					adr_o_r <= {wb_adr_i[31:2], 2'b00};
+				end else if (read_req_sdram) begin
+					buf_clean <= {(1<<BUF_WIDTH){1'b0}};
+					sdram_state <= READ;
+					adr_o_r <= {wb_adr[31:2], 2'b00};
 					acc_o <= 1'b1;
-					ack_count <= 0;
 				end
 			end
 
@@ -240,15 +351,16 @@ module wb_port #(
 					acc_o <= 1'b0;
 				end
 
-				if (ack_i | (ack_count > 0 & cycle_count < 7)) begin
+				if (ack_i | (ack_count != 0 & cycle_count != 7)) begin
 					if (even_adr) begin
-						buf_data[adr_i[BUF_WIDTH+1:2]][31:16] <= dat_i;
+						dat_r[31:16] <= dat_i;
+						sdram_write_bufram <= 1'b1;
 					end else begin
-						buf_data[adr_i[BUF_WIDTH+1:2]][15:0] <= dat_i;
-						// only signal read done on first burst
-						if (adrhit & ack_count < 2 ) begin
+						dat_r[15:0] <= dat_i;
+						buf_clean[adr_i[BUF_WIDTH+1:2]] <= 1'b1;
+						// signal read done on first burst
+						if (ack_count != 2 & cycle_count == 0) begin
 							read_done <= 1'b1;
-							buf_adr <= adr_i[31:BUF_WIDTH+2];
 						end
 					end
 				end
@@ -259,37 +371,24 @@ module wb_port #(
 					acc_o <= 1'b1;
 				end else if (ack_count == 2 & cycle_count == 7) begin
 					acc_o <= 1'b0;
-					state <= IDLE;
+					sdram_state <= IDLE;
 				end
-				/* Incoming access that is not to the current read */
-				if(!wb_we_i & wb_cycle_edge & !bufhit)
-					read_invalid = 1;
 			end
 
 			WRITE: begin
 				if (ack_i) begin
 					acc_o <= 1'b0;
-					state <= IDLE;					
+					sdram_state <= IDLE;
 				end
+			end
+
+			default: begin
+				sdram_state <= IDLE;
 			end
 			endcase
 
-			if (bufw_we_i & (bufw_adr_i[31:BUF_WIDTH+2] == buf_adr)) begin
-				if (bufw_sel_i[3])
-					buf_data[bufw_adr_i[BUF_WIDTH+1:2]][31:24] <= bufw_dat_i[31:24];
-				if (bufw_sel_i[2])
-					buf_data[bufw_adr_i[BUF_WIDTH+1:2]][23:16] <= bufw_dat_i[23:16];
-				if (bufw_sel_i[1])
-					buf_data[bufw_adr_i[BUF_WIDTH+1:2]][15:8]  <= bufw_dat_i[15:8];
-				if (bufw_sel_i[0])
-					buf_data[bufw_adr_i[BUF_WIDTH+1:2]][7:0]   <= bufw_dat_i[7:0];
-			end
-
 			if (read_done_ack)
 				read_done <= 1'b0;
-
-			if (write_done_ack)
-				write_done <= 1'b0;
 		end
 	end
 endmodule

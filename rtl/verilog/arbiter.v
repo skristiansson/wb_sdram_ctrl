@@ -24,6 +24,7 @@
  */
 
 module arbiter #(
+	parameter TECHNOLOGY	= "GENERIC",
 	parameter WB_PORTS	= 3,
 	parameter BUF_WIDTH	= 3
 )
@@ -112,6 +113,7 @@ module arbiter #(
 			wb_cycle_r[i] <= wb_cycle[i];
 
 		wb_port #(
+			.TECHNOLOGY	(TECHNOLOGY),
 			.BUF_WIDTH	(BUF_WIDTH)
 		)
 		wb_port (

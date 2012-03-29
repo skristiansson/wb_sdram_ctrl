@@ -24,6 +24,7 @@
  */
 
 module wb_sdram_ctrl #(
+	parameter TECHNOLOGY	= "GENERIC",
 	parameter CLK_FREQ_MHZ	= 100,	// sdram_clk freq in MHZ
 	parameter POWERUP_DELAY	= 200,	// power up delay in us
 	parameter BURST_LENGTH	= 8,	// 0, 1, 2, 4 or 8 (0 = full page)
@@ -120,6 +121,7 @@ module wb_sdram_ctrl #(
 	);
 
 	arbiter #(
+		.TECHNOLOGY	(TECHNOLOGY),
 		.WB_PORTS	(WB_PORTS),
 		.BUF_WIDTH	(BUF_WIDTH)
 	)
