@@ -142,10 +142,10 @@ module arbiter #(
 			.we_o		(p_we_o[i]),
 
 			// Buffer write
-			.bufw_adr_i	(),
-			.bufw_dat_i	(),
-			.bufw_sel_i	(),
-			.bufw_we_i	()
+			.bufw_adr_i	(p_bufw_adr[i]),
+			.bufw_dat_i	(p_bufw_dat[i]),
+			.bufw_sel_i	(p_bufw_sel[i]),
+			.bufw_we_i	(p_bufw_we[i])
 		);
 
 	end
@@ -205,9 +205,12 @@ module arbiter #(
 	// Signal when a write have happened to all ports, so they can write
 	// the data into their buffer in case of a hit
 	integer j,k;
-	always @(sdram_clk) begin
+	always @(posedge sdram_clk) begin
 		for (k = 0; k < WB_PORTS; k=k+1) begin
 			p_bufw_we[k] <= 1'b0;
+			p_bufw_adr[k] <= 0;
+			p_bufw_dat[k] <= 0;
+			p_bufw_sel[k] <= 0;
 			for (j = 0; j < WB_PORTS; j=j+1) begin
 				if (j!=k & wb_cycle[j] &
 				    !wb_cycle_r[j] & wb_we_i[j]) begin
