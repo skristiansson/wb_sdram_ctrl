@@ -409,6 +409,7 @@ module sdram_ctrl #(
 					a[9:0] <= adr_i[10:1];
 					dqm_o <= 2'b00;
 					cmd <= CMD_READ;
+					state <= READ;
 				end else if (acc_i & curr_bank_active) begin
 					we_r <= we_i;
 					cmd <= CMD_PRE;
