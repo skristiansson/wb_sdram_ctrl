@@ -250,7 +250,9 @@ dual_clock_fifo #(
 						read_req_wb <= 1'b1;
 						wb_state <= REFILL;
 					end
-				end else if (wb_cyc_i & wb_stb_i & wb_we_i) begin
+				end else if (wb_cyc_i & wb_stb_i & wb_we_i &
+					     (bufhit | first_req |
+					      buf_adr != wb_adr_i[31:BUF_WIDTH+2])) begin
 					if (!wrfifo_full) begin
 						wrfifo_wrreq <= 1'b1;
 						wb_ack_o <= 1'b1;
