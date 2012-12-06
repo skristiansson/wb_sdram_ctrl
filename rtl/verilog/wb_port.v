@@ -141,7 +141,7 @@ module wb_port #(
 	assign next_bufhit   = (buf_adr == next_wb_adr[31:BUF_WIDTH+2]) &
 			       buf_clean_wb[next_wb_adr[BUF_WIDTH+1:2]];
 	assign bufw_hit      = (bufw_adr_i[31:BUF_WIDTH+2] ==
-				wb_adr_i[31:BUF_WIDTH+2]);
+				buf_adr[31:BUF_WIDTH+2]);
 
 	assign even_adr      = (adr_i[1] == 1'b0);
 	// output lower 16 bits after first write ack
