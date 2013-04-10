@@ -207,7 +207,7 @@ module arbiter #(
 	// Signal when a write have happened to all ports, so they can write
 	// the data into their buffer in case of a hit
 	integer j,k;
-	always @(posedge sdram_clk) begin
+	always @(posedge wb_clk) begin
 		for (k = 0; k < WB_PORTS; k=k+1) begin
 			p_bufw_we[k] <= 1'b0;
 			p_bufw_adr[k] <= 0;
