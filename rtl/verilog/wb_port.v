@@ -283,19 +283,23 @@ dual_clock_fifo #(
 			end
 
 			WRITE: begin
-				if (wb_cyc_i & wb_stb_i & wb_we_i &
-				  ((wb_cti_i == INC_BURST) | !wb_ack_o)) begin
+				if (wb_cyc_i & wb_stb_i & wb_we_i) begin
 
 					if (!wrfifo_full) begin
 						wrfifo_wrreq <= 1'b1;
 						wb_ack_o <= 1'b1;
 					end
 
-					if (bufhit)
+					if (bufhit) begin
+						wb_sel <= wb_sel_i;
+						wb_dat <= wb_dat_i;
+						wb_adr <= wb_adr_i;
 						wb_write_bufram <= 1'b1;
-				end else begin
-					wb_state <= IDLE;
+					end
 				end
+
+				if ((wb_cti_i != INC_BURST) & wb_ack_o)
+					wb_state <= IDLE;
 			end
 			endcase
 		end
