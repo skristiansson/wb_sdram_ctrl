@@ -71,7 +71,7 @@ module wb_port #(
 	reg				wb_write_bufram;
 	reg				sdram_write_bufram;
 	wire [3:0]			wb_bufram_we;
-	wire [(1<<BUF_WIDTH)-1:0]	wb_bufram_addr;
+	wire [BUF_WIDTH-1:0]		wb_bufram_addr;
 	wire [31:0]			wb_bufram_di;
 	wire [3:0]			sdram_bufram_we;
 
