@@ -120,12 +120,12 @@ module wb_sdram_ctrl #(
 		.we_i		(sdram_if_we)
 	);
 
-	arbiter #(
+	wb_port_arbiter #(
 		.TECHNOLOGY	(TECHNOLOGY),
 		.WB_PORTS	(WB_PORTS),
 		.BUF_WIDTH	(BUF_WIDTH)
 	)
-	arbiter (
+	wb_port_arbiter (
 		.wb_clk		(wb_clk),
 		.wb_rst		(wb_rst),
 

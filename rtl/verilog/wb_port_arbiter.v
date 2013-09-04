@@ -23,7 +23,7 @@
  * WORK, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-module arbiter #(
+module wb_port_arbiter #(
 	parameter TECHNOLOGY	= "GENERIC",
 	parameter WB_PORTS	= 3,
 	parameter BUF_WIDTH	= 3
