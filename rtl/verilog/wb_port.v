@@ -299,8 +299,10 @@ dual_clock_fifo #(
 					end
 				end
 
-				if ((wb_cti_i != INC_BURST) & wb_ack_o)
+				if ((wb_cti_i != INC_BURST) & wb_ack_o) begin
 					wb_state <= IDLE;
+					wb_write_ack <= 0;
+				end
 			end
 			endcase
 		end
