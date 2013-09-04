@@ -110,20 +110,20 @@ module wb_port #(
 	wire [31:0]			sdram_dat;
 	wire [31:0]			sdram_adr;
 
-	parameter [2:0]
+	localparam [2:0]
 		IDLE	= 3'd0,
 		READ	= 3'd1,
 		WRITE	= 3'd2,
 		REFILL	= 3'd3;
 
 
-	parameter [2:0]
+	localparam [2:0]
 		CLASSIC      = 3'b000,
 		CONST_BURST  = 3'b001,
 		INC_BURST    = 3'b010,
 		END_BURST    = 3'b111;
 
-	parameter [1:0]
+	localparam [1:0]
 		LINEAR_BURST = 2'b00,
 		WRAP4_BURST  = 2'b01,
 		WRAP8_BURST  = 2'b10,
