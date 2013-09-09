@@ -154,6 +154,7 @@ module sdram_ctrl #(
 			cmd <= CMD_NOP;
 			state <= INIT_POWERUP;
 			a <= 0;
+			ba <= 0;
 			ack_o <= 1'b0;
 			cycle_count <= 0;
 			we_r <= 0;
