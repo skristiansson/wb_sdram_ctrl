@@ -1,0 +1,8 @@
+In order to run the test bench, two additional packages are required
+vlog_tb_utils : Adds support for generating VCD files and being able
+                to abort simulation after a set time
+wb_bfm        : Wishbone Bus Functional Model that generates wishbone
+                write/read requests to wb_sdram_ctrl and checks that
+                the correct data is read back after a write
+
+Both these packages are available from github.com/openrisc/orpsoc-cores
