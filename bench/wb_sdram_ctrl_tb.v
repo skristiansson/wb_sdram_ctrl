@@ -99,7 +99,7 @@ module wb_sdram_ctrl_tb;
 	     .wb_stb_o (wb_stb[i]),
 	     .wb_cti_o (wb_cti[i*3+:3]),
 	     .wb_bte_o (wb_bte[i*2+:2]),
-	     .wb_rdt_i (wb_rdt[i*32+:32]),
+	     .wb_dat_i (wb_rdt[i*32+:32]),
 	     .wb_ack_i (wb_ack[i]),
 	     .wb_err_i (1'b0),
 	     .wb_rty_i (1'b0),
