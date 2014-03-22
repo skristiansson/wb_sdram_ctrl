@@ -188,6 +188,7 @@ module wb_port_arbiter #(
 		input [WB_PORTS-1:0] in;
 		integer i;
 		begin
+			ff1 = 0;
 			for (i = WB_PORTS-1; i >= 0; i=i-1)
 				if (in[i]) ff1 = i;
 		end
