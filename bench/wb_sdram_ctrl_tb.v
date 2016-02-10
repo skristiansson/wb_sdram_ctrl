@@ -82,13 +82,18 @@ module wb_sdram_ctrl_tb;
 
    genvar 	 i;
    
+   integer 	 TRANSACTIONS;
+   integer 	 SUBTRANSACTIONS;
+   integer 	 SEED;
+
    generate
       for(i=0;i<WB_PORTS;i=i+1) begin : masters
 	 wb_bfm_transactor
 	    #(.MEM_HIGH (MEMORY_SIZE_WORDS*(i+1)-1),
 	      .MEM_LOW  (MEMORY_SIZE_WORDS*i),
-	      .VERBOSE  (1))
-	 wb_bfm_transactor0
+	      .AUTORUN  (0),
+	      .VERBOSE  (0))
+	 bfm
 	    (.wb_clk_i (wb_clk),
 	     .wb_rst_i (wbm_rst),
 	     .wb_adr_o (wb_adr[i*32+:32]),
@@ -105,44 +110,33 @@ module wb_sdram_ctrl_tb;
 	     .wb_rty_i (1'b0),
 	     //Test Control
 	     .done(done_int[i]));
+
+	 initial begin
+	    //Grab CLI parameters
+	    if($value$plusargs("transactions=%d", TRANSACTIONS))
+	      bfm.set_transactions(TRANSACTIONS);
+	    if($value$plusargs("subtransactions=%d", SUBTRANSACTIONS))
+	      bfm.set_subtransactions(SUBTRANSACTIONS);
+	    if($value$plusargs("seed=%d", SEED))
+	      bfm.SEED = SEED;
+
+	    bfm.display_settings;
+	    bfm.run;
+	    bfm.display_stats;
+	 end
       end // block: slaves
    endgenerate
-   
-   integer 	 idx;
-
-   time start_time[WB_PORTS-1:0];
-   time ack_delay[WB_PORTS-1:0];
-   integer num_transactions[WB_PORTS-1:0];
    
    assign done = &done_int;
    
    always @(done) begin
       if(done === 1) begin
-	 $display("Average wait times");
-	 for(idx=0;idx<WB_PORTS;idx=idx+1)
-	   $display("Master %0d : %f",idx, ack_delay[idx]/num_transactions[idx]);
 	 $display("All tests passed!");
 	 $finish;
 	 
       end
    end
 
-   generate
-      for(i=0;i<WB_PORTS;i=i+1) begin : wait_time
-	 initial begin
-	    ack_delay[i] = 0;
-	    num_transactions[i] = 0;
-	    while(1) begin
-	       @(posedge wb_cyc[i]);
-	       start_time[i] = $time;
-	       @(posedge wb_ack[i]);
-	       ack_delay[i] = ack_delay[i] + $time-start_time[i];
-	       num_transactions[i] = num_transactions[i]+1;
-	    end
-	 end
-      end
-   endgenerate
-   
 wb_sdram_ctrl
   #(.TECHNOLOGY	("GENERIC"),
     .CLK_FREQ_MHZ	(100),	// sdram_clk freq in MHZ
