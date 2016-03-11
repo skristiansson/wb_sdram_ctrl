@@ -26,6 +26,7 @@
 module sdram_ctrl #(
 	parameter CLK_FREQ_MHZ	= 100,	// sdram_clk freq in MHZ
 	parameter POWERUP_DELAY	= 200,	// power up delay in us
+	parameter REFRESH_MS	= 64,	// time to wait between refreshes in ms
 	parameter BURST_LENGTH	= 8,	// 0, 1, 2, 4 or 8 (0 = full page)
 	parameter ROW_WIDTH	= 13,	// Row width
 	parameter COL_WIDTH	= 9,	// Column width
@@ -68,7 +69,7 @@ module sdram_ctrl #(
 
 	localparam POWERUP_CNT = CLK_FREQ_MHZ*POWERUP_DELAY;
 	// refresh should be done for each row every 64 ms => 64e-3/2^ROW_WIDTH
-	localparam REFRESH_TIMEOUT = (CLK_FREQ_MHZ*64000)/(1<<ROW_WIDTH);
+	localparam REFRESH_TIMEOUT = (CLK_FREQ_MHZ*REFRESH_MS*1000)/(1<<ROW_WIDTH);
 
 	// Burst types
 	localparam

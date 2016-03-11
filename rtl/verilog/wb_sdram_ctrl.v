@@ -27,6 +27,7 @@ module wb_sdram_ctrl #(
 	parameter TECHNOLOGY	= "GENERIC",
 	parameter CLK_FREQ_MHZ	= 100,	// sdram_clk freq in MHZ
 	parameter POWERUP_DELAY	= 200,	// power up delay in us
+	parameter REFRESH_MS	= 64,	// time to wait between refreshes in ms
 	parameter BURST_LENGTH	= 8,	// 0, 1, 2, 4 or 8 (0 = full page)
 	parameter WB_PORTS	= 3,	// Number of wishbone ports
 	parameter BUF_WIDTH	= 3,	// Buffer size = 2^BUF_WIDTH
@@ -83,6 +84,7 @@ module wb_sdram_ctrl #(
 	sdram_ctrl #(
 		.CLK_FREQ_MHZ	(CLK_FREQ_MHZ),
 		.POWERUP_DELAY	(POWERUP_DELAY),
+		.REFRESH_MS	(REFRESH_MS),
 		.BURST_LENGTH	(BURST_LENGTH),
 		.ROW_WIDTH	(ROW_WIDTH),
 		.COL_WIDTH	(COL_WIDTH),
