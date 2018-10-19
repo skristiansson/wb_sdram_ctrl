@@ -73,6 +73,7 @@ module dpram_ecp5 #(
 		.CLKA(clk_a), .CLKB(clk_b),
 		.WEA(|we_a), .CEA(1'b1), .OCEA(1'b1),
 		.WEB(|we_b), .CEB(1'b1), .OCEB(1'b1),
+		.CSA2 (1'b0), .CSA1 (1'b0), .CSA0 (1'b0), .CSB2 (1'b0), .CSB1 (1'b0), .CSB0 (1'b0),
 		.RSTA(1'b0), .RSTB(1'b0)
 	);
 
@@ -92,6 +93,7 @@ module dpram_ecp5 #(
 		.CLKA(clk_a), .CLKB(clk_b),
 		.WEA(|we_a), .CEA(1'b1), .OCEA(1'b1),
 		.WEB(|we_b), .CEB(1'b1), .OCEB(1'b1),
+		.CSA2 (1'b0), .CSA1 (1'b0), .CSA0 (1'b0), .CSB2 (1'b0), .CSB1 (1'b0), .CSB0 (1'b0),
 		.RSTA(1'b0), .RSTB(1'b0)
 	);
 
