@@ -73,6 +73,22 @@ dpram_altera #(
 	.di_b		(di_b),
 	.do_b		(do_b)
 );
+end else if (TECHNOLOGY == "ECP5") begin : dpram_ecp5
+dpram_ecp5 #(
+	.ADDR_WIDTH(ADDR_WIDTH)
+) dpram_ecp5 (
+	.clk_a		(clk_a),
+	.addr_a		(addr_a),
+	.we_a		(we_a),
+	.di_a		(di_a),
+	.do_a		(do_a),
+
+	.clk_b		(clk_b),
+	.addr_b		(addr_b),
+	.we_b		(we_b),
+	.di_b		(di_b),
+	.do_b		(do_b)
+);
 end
 endgenerate
 endmodule
