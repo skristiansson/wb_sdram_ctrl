@@ -25,8 +25,10 @@
 
 module wb_sdram_ctrl_tb;
 
+   parameter technology = "GENERIC";
+
    localparam MEMORY_SIZE_WORDS = 4096;
-   
+
    localparam WB_PORTS = 3;
 
    localparam BA_WIDTH = 2;
@@ -34,13 +36,18 @@ module wb_sdram_ctrl_tb;
    vlog_tb_utils vlog_tb_utils0();
 
    reg wbm_rst = 1'b1;
-   
+
    reg wb_clk = 1'b1;
    reg wb_rst = 1'b1;
-   
+
    reg sdram_clk = 1'b1;
    reg sdram_rst = 1'b1;
-   
+
+`ifdef USE_LATTICE_GSR_PUR
+   GSR GSR_INST(.GSR (sdram_rst));
+   PUR PUR_INST(.PUR (sdram_rst));
+`endif
+
    initial #1800000 wbm_rst <= 1'b0;
 
    initial #200000 wb_rst <= 1'b0;
@@ -50,7 +57,7 @@ module wb_sdram_ctrl_tb;
    always #5000 sdram_clk <= !sdram_clk;
 
    assign #1 sdram_clk_d = sdram_clk;
-   
+
    wire [BA_WIDTH-1:0] ba;
    wire [12:0] 	       a;
    wire 	       cs_n;
@@ -64,7 +71,7 @@ module wb_sdram_ctrl_tb;
    wire 	       cke;
 
    wire [15:0] 	       dq;
-   
+
    wire [WB_PORTS*32-1:0] wb_adr;
    wire [WB_PORTS-1:0] 	  wb_stb;
    wire [WB_PORTS-1:0] 	  wb_cyc;
@@ -75,13 +82,13 @@ module wb_sdram_ctrl_tb;
    wire [WB_PORTS*32-1:0] wb_dat;
    wire [WB_PORTS*32-1:0] wb_rdt;
    wire [WB_PORTS-1:0] 	  wb_ack;
-   
+
    wire [31:0] 	 slave_writes;
    wire [31:0] 	 slave_reads;
    wire [WB_PORTS-1:0] done_int;
 
    genvar 	 i;
-   
+
    integer 	 TRANSACTIONS;
    integer 	 SUBTRANSACTIONS;
    integer 	 SEED;
@@ -99,7 +106,7 @@ module wb_sdram_ctrl_tb;
 	     .wb_adr_o (wb_adr[i*32+:32]),
 	     .wb_dat_o (wb_dat[i*32+:32]),
 	     .wb_sel_o (wb_sel[i*4+:4]),
-	     .wb_we_o  (wb_we[i] ), 
+	     .wb_we_o  (wb_we[i] ),
 	     .wb_cyc_o (wb_cyc[i]),
 	     .wb_stb_o (wb_stb[i]),
 	     .wb_cti_o (wb_cti[i*3+:3]),
@@ -126,19 +133,19 @@ module wb_sdram_ctrl_tb;
 	 end
       end // block: slaves
    endgenerate
-   
+
    assign done = &done_int;
-   
+
    always @(done) begin
       if(done === 1) begin
 	 $display("All tests passed!");
 	 $finish;
-	 
+
       end
    end
 
 wb_sdram_ctrl
-  #(.TECHNOLOGY	("GENERIC"),
+  #(.TECHNOLOGY	(technology),
     .CLK_FREQ_MHZ	(100),	// sdram_clk freq in MHZ
     .POWERUP_DELAY	(0),	// power up delay in us
     .BURST_LENGTH	(8),	// 0), 1), 2), 4 or 8 (0 = full page)
@@ -184,7 +191,7 @@ wb_sdram_ctrl
    //Tristate buffer
    assign dq = dq_oe ? dq_o : 16'bz;
    assign dq_i = dq;
-   
+
    //Memory model
    mt48lc16m16a2 mt48lc16m16a20
      (.Dq    (dq),
@@ -197,5 +204,5 @@ wb_sdram_ctrl
       .Cas_n (cas),
       .We_n  (we),
       .Dqm   (dqm));
-   
+
 endmodule
